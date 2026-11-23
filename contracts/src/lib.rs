@@ -138,6 +138,12 @@ impl KoloSavingsContract {
             panic!("Contribution amount exceeds maximum limit");
         }
 
+        if let Some(target) = target_amount {
+            if target <= 0 {
+                panic!("Target amount must be positive");
+            }
+        }
+
         admin.require_auth();
 
         let cycle_len = expected_cycle_days.unwrap_or(30) * 17_280;

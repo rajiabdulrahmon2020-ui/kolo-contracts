@@ -932,6 +932,136 @@ fn test_initialize_with_exceeding_max_amount_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Target amount must be positive")]
+fn issue_79_initialize_with_negative_target_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, KoloSavingsContract);
+    let client = KoloSavingsContractClient::new(&env, &contract_id);
+
+    client.initialize(
+        &Address::generate(&env),
+        &Address::generate(&env),
+        &String::from_str(&env, "Test"),
+        &1000i128,
+        &GroupType::GoalBased,
+        &Some(-1i128),
+        &true,
+        &None,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Amount must be positive")]
+fn issue_79_negative_contribution_is_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, KoloSavingsContract);
+    let client = KoloSavingsContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(Address::generate(&env));
+    let member = Address::generate(&env);
+
+    client.initialize(
+        &admin,
+        &token,
+        &String::from_str(&env, "Test"),
+        &1000i128,
+        &GroupType::GoalBased,
+        &None,
+        &false,
+        &None,
+    );
+    client.add_member(&member);
+    client.contribute(&member, &-1i128);
+}
+
+#[test]
+#[should_panic(expected = "Withdrawal amount must be positive")]
+fn issue_79_negative_withdrawal_is_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, KoloSavingsContract);
+    let client = KoloSavingsContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(Address::generate(&env));
+    let member = Address::generate(&env);
+
+    client.initialize(
+        &admin,
+        &token,
+        &String::from_str(&env, "Test"),
+        &1000i128,
+        &GroupType::GoalBased,
+        &None,
+        &false,
+        &None,
+    );
+    client.add_member(&member);
+    client.withdraw_savings(&member, &-1i128);
+}
+
+#[test]
+#[should_panic(expected = "Payout amount must be positive")]
+fn issue_79_negative_partial_payout_is_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, KoloSavingsContract);
+    let client = KoloSavingsContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(Address::generate(&env));
+    let member = Address::generate(&env);
+    let token_client = token::StellarAssetClient::new(&env, &token);
+
+    client.initialize(
+        &admin,
+        &token,
+        &String::from_str(&env, "Test"),
+        &1000i128,
+        &GroupType::Rotational,
+        &None,
+        &false,
+        &None,
+    );
+    client.add_member(&member);
+    token_client.mint(&member, &1000i128);
+    client.contribute(&member, &1000i128);
+    client.payout(&member, &Some(-1i128));
+}
+
+#[test]
+fn issue_80_surplus_does_not_increase_full_payout() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, KoloSavingsContract);
+    let client = KoloSavingsContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(Address::generate(&env));
+    let token_client = token::StellarAssetClient::new(&env, &token);
+    let member = Address::generate(&env);
+
+    client.initialize(
+        &admin,
+        &token,
+        &String::from_str(&env, "Surplus"),
+        &1000i128,
+        &GroupType::Rotational,
+        &None,
+        &false,
+        &None,
+    );
+    client.add_member(&member);
+    token_client.mint(&member, &7000i128);
+    client.contribute(&member, &1000i128);
+    token_client.transfer(&member, &contract_id, &5000i128);
+
+    client.payout(&member, &None);
+
+    assert_eq!(token_client.balance(&member), 2000);
+    assert_eq!(token_client.balance(&contract_id), 5000);
+}
+
+#[test]
 #[should_panic(expected = "Math overflow in pool calculation")]
 fn test_payout_pool_size_overflow_panics() {
     let env = Env::default();

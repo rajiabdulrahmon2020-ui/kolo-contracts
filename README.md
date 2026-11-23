@@ -96,6 +96,17 @@ The contract checks that the next expected member matches the requested recipien
 
 Because the contract's pool accounting, contribution readiness, and backend payout lifecycle must work together, treat these rules as code under development. Review and test the full lifecycle before deploying a public instance.
 
+### Surplus balance policy (issue #80)
+
+An account balance above the current cycle's recorded contributions is treated
+as surplus, not as additional contribution readiness. A full payout remains
+bounded by `contribution_amount × frozen_cycle_member_count`; surplus cannot
+increase that amount or bypass the cycle's contribution checks. Callers may
+request a smaller positive partial payout when the full pool is not yet
+available, but a partial payout can never exceed the computed full pool or the
+actual contract balance. Surplus is not swept automatically and remains in the
+contract for later, explicitly authorized payouts.
+
 ## Build and test
 
 Requires Rust and the Wasm target:
